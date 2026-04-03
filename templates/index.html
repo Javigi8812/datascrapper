@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Honimunn Scraper</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232733;
+    --border: #2e3340;
+    --text: #e1e4eb;
+    --text2: #8b90a0;
+    --accent: #c9a84c;
+    --accent-dim: rgba(201,168,76,.15);
+    --green: #4ade80;
+    --red: #f87171;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2rem 1rem;
+  }
+  .container { width: 100%; max-width: 720px; }
+  header { text-align: center; margin-bottom: 2rem; }
+  header h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: .02em; }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--text2); font-size: .85rem; margin-top: .35rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+  .card-title {
+    font-size: .8rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: var(--text2);
+    margin-bottom: .75rem;
+  }
+
+  .tabs {
+    display: flex;
+    gap: .5rem;
+    margin-bottom: 1rem;
+  }
+  .tab {
+    flex: 1;
+    padding: .55rem;
+    text-align: center;
+    font-size: .8rem;
+    font-weight: 500;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text2);
+    transition: all .15s;
+  }
+  .tab:hover { border-color: var(--accent); color: var(--text); }
+  .tab.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+  textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: .75rem;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: .82rem;
+    resize: vertical;
+    line-height: 1.6;
+  }
+  textarea::placeholder { color: var(--text2); }
+  textarea:focus { outline: none; border-color: var(--accent); }
+
+  .file-drop {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    color: var(--text2);
+    cursor: pointer;
+    transition: all .15s;
+    position: relative;
+  }
+  .file-drop:hover, .file-drop.dragover {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .file-drop input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .file-drop .icon { font-size: 1.5rem; margin-bottom: .5rem; }
+  .file-drop .label { font-size: .85rem; }
+  .file-drop .sublabel { font-size: .75rem; margin-top: .25rem; }
+  .file-name {
+    margin-top: .5rem;
+    font-size: .82rem;
+    color: var(--accent);
+    display: none;
+  }
+
+  .btn {
+    width: 100%;
+    padding: .75rem;
+    border: none;
+    border-radius: 6px;
+    font-size: .9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .15s;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #111;
+  }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:disabled {
+    opacity: .4;
+    cursor: not-allowed;
+    filter: none;
+  }
+
+  .progress-section { display: none; }
+  .progress-section.visible { display: block; }
+  .progress-bar-track {
+    width: 100%;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: .75rem;
+  }
+  .progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width .3s ease;
+    width: 0%;
+  }
+  .progress-status {
+    font-size: .82rem;
+    color: var(--text2);
+    margin-bottom: .5rem;
+  }
+  .log-box {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: .75rem;
+    max-height: 200px;
+    overflow-y: auto;
+    font-family: "SF Mono", "Fira Code", monospace;
+    font-size: .75rem;
+    line-height: 1.7;
+    color: var(--text2);
+  }
+  .log-box .entry { padding: 1px 0; }
+  .log-box .entry.done { color: var(--green); }
+  .log-box .entry.error { color: var(--red); }
+
+  .results-section { display: none; }
+  .results-section.visible { display: block; }
+  .result-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .65rem 0;
+    border-bottom: 1px solid var(--border);
+    gap: .75rem;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-info { flex: 1; min-width: 0; }
+  .result-title {
+    font-size: .85rem;
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .result-url {
+    font-size: .7rem;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .result-status {
+    font-size: .7rem;
+    padding: .2rem .5rem;
+    border-radius: 4px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .result-status.ok { background: rgba(74,222,128,.12); color: var(--green); }
+  .result-status.err { background: rgba(248,113,113,.12); color: var(--red); }
+  .btn-download {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: .35rem .75rem;
+    border-radius: 5px;
+    font-size: .75rem;
+    cursor: pointer;
+    white-space: nowrap;
+    text-decoration: none;
+    transition: all .15s;
+  }
+  .btn-download:hover { border-color: var(--accent); color: var(--accent); }
+
+  .consolidated-row {
+    margin-top: .75rem;
+    padding-top: .75rem;
+    border-top: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .consolidated-row span { font-size: .82rem; color: var(--text2); }
+
+  .invalid-urls {
+    margin-top: .5rem;
+    font-size: .75rem;
+    color: var(--red);
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1><span>Honimunn</span> Scraper</h1>
+    <p>Extrae itinerarios de viaje y exporta a Excel</p>
+  </header>
+
+  <!-- Input Card -->
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" data-tab="urls" onclick="switchTab('urls')">Pegar URLs</button>
+      <button class="tab" data-tab="csv" onclick="switchTab('csv')">Subir CSV</button>
+    </div>
+
+    <div id="panel-urls">
+      <textarea id="url-input" placeholder="Pega las URLs aqui, una por linea:&#10;&#10;https://destino.honimunn.com/Itinerary/Landing/abc123...&#10;https://destino.honimunn.com/Itinerary/Overview/def456..."></textarea>
+    </div>
+
+    <div id="panel-csv" style="display:none">
+      <div class="file-drop" id="file-drop">
+        <input type="file" id="csv-input" accept=".csv">
+        <div class="icon">&#128196;</div>
+        <div class="label">Arrastra un CSV o haz click para seleccionar</div>
+        <div class="sublabel">El CSV debe tener una columna "url"</div>
+      </div>
+      <div class="file-name" id="file-name"></div>
+    </div>
+
+    <div class="invalid-urls" id="invalid-urls"></div>
+
+    <div style="margin-top:1rem">
+      <button class="btn btn-primary" id="btn-scrape" onclick="startScrape()">Iniciar Scraping</button>
+    </div>
+  </div>
+
+  <!-- Progress Card -->
+  <div class="card progress-section" id="progress-section">
+    <div class="card-title">Progreso</div>
+    <div class="progress-status" id="progress-status">Preparando...</div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progress-fill"></div>
+    </div>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+  <!-- Results Card -->
+  <div class="card results-section" id="results-section">
+    <div class="card-title">Resultados</div>
+    <div id="results-list"></div>
+    <div class="consolidated-row" id="consolidated-row" style="display:none">
+      <span>Resumen consolidado</span>
+      <a class="btn-download" id="consolidated-link" href="#">Descargar</a>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentTab = 'urls';
+let selectedFile = null;
+
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+  document.getElementById('panel-urls').style.display = tab === 'urls' ? '' : 'none';
+  document.getElementById('panel-csv').style.display = tab === 'csv' ? '' : 'none';
+}
+
+const fileDrop = document.getElementById('file-drop');
+const csvInput = document.getElementById('csv-input');
+const fileName = document.getElementById('file-name');
+
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('dragover'); });
+fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
+fileDrop.addEventListener('drop', e => {
+  e.preventDefault();
+  fileDrop.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+});
+csvInput.addEventListener('change', () => { if (csvInput.files.length) handleFile(csvInput.files[0]); });
+
+function handleFile(file) {
+  selectedFile = file;
+  fileName.textContent = file.name;
+  fileName.style.display = 'block';
+}
+
+function addLog(msg, cls) {
+  const box = document.getElementById('log-box');
+  const el = document.createElement('div');
+  el.className = 'entry' + (cls ? ' ' + cls : '');
+  el.textContent = msg;
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function startScrape() {
+  const btn = document.getElementById('btn-scrape');
+  const invalidEl = document.getElementById('invalid-urls');
+  invalidEl.textContent = '';
+
+  let body;
+  let fetchOpts;
+
+  if (currentTab === 'urls') {
+    const text = document.getElementById('url-input').value.trim();
+    if (!text) return;
+    const urls = text.split('\n').map(u => u.trim()).filter(Boolean);
+    body = JSON.stringify({ urls });
+    fetchOpts = {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    };
+  } else {
+    if (!selectedFile) return;
+    const fd = new FormData();
+    fd.append('csv_file', selectedFile);
+    fetchOpts = { method: 'POST', body: fd };
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Scraping...';
+
+  const progressSection = document.getElementById('progress-section');
+  const resultsSection = document.getElementById('results-section');
+  progressSection.classList.add('visible');
+  resultsSection.classList.remove('visible');
+  document.getElementById('log-box').innerHTML = '';
+  document.getElementById('progress-fill').style.width = '0%';
+  document.getElementById('progress-status').textContent = 'Iniciando...';
+
+  fetch('/scrape', fetchOpts)
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        addLog(data.error, 'error');
+        btn.disabled = false;
+        btn.textContent = 'Iniciar Scraping';
+        return;
+      }
+      if (data.invalid && data.invalid.length) {
+        invalidEl.textContent = 'URLs invalidas: ' + data.invalid.join(', ');
+      }
+      addLog('Iniciado: ' + data.url_count + ' URL(s)');
+      listenProgress(data.job_id);
+    })
+    .catch(err => {
+      addLog('Error: ' + err, 'error');
+      btn.disabled = false;
+      btn.textContent = 'Iniciar Scraping';
+    });
+}
+
+function listenProgress(jobId) {
+  const source = new EventSource('/progress/' + jobId);
+  const fill = document.getElementById('progress-fill');
+  const status = document.getElementById('progress-status');
+
+  source.onmessage = function(e) {
+    const data = JSON.parse(e.data);
+
+    if (data.type === 'progress') {
+      status.textContent = data.message;
+      if (data.total > 0) {
+        const pct = Math.round((data.current / data.total) * 100);
+        fill.style.width = pct + '%';
+      }
+      addLog(data.message);
+    }
+
+    if (data.type === 'done') {
+      source.close();
+      fill.style.width = '100%';
+      status.textContent = 'Completado';
+      addLog('Scraping completado', 'done');
+      showResults(data.results, data.consolidated);
+      document.getElementById('btn-scrape').disabled = false;
+      document.getElementById('btn-scrape').textContent = 'Iniciar Scraping';
+    }
+
+    if (data.type === 'error') {
+      source.close();
+      addLog('Error: ' + data.message, 'error');
+      document.getElementById('btn-scrape').disabled = false;
+      document.getElementById('btn-scrape').textContent = 'Iniciar Scraping';
+    }
+  };
+
+  source.onerror = function() {
+    source.close();
+    document.getElementById('btn-scrape').disabled = false;
+    document.getElementById('btn-scrape').textContent = 'Iniciar Scraping';
+  };
+}
+
+function showResults(results, consolidated) {
+  const section = document.getElementById('results-section');
+  const list = document.getElementById('results-list');
+  list.innerHTML = '';
+
+  results.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+
+    const info = document.createElement('div');
+    info.className = 'result-info';
+    info.innerHTML =
+      '<div class="result-title">' + esc(r.title || r.url) + '</div>' +
+      '<div class="result-url">' + esc(r.url) + '</div>';
+
+    row.appendChild(info);
+
+    const statusEl = document.createElement('span');
+    if (r.status === 'ok') {
+      statusEl.className = 'result-status ok';
+      statusEl.textContent = 'OK';
+    } else {
+      statusEl.className = 'result-status err';
+      statusEl.textContent = 'Error';
+    }
+    row.appendChild(statusEl);
+
+    if (r.filename) {
+      const dl = document.createElement('a');
+      dl.className = 'btn-download';
+      dl.href = '/download/' + encodeURIComponent(r.filename);
+      dl.textContent = 'Descargar';
+      row.appendChild(dl);
+    }
+
+    list.appendChild(row);
+  });
+
+  const consRow = document.getElementById('consolidated-row');
+  if (consolidated) {
+    document.getElementById('consolidated-link').href = '/download/' + encodeURIComponent(consolidated);
+    consRow.style.display = 'flex';
+  } else {
+    consRow.style.display = 'none';
+  }
+
+  section.classList.add('visible');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+</script>
+</body>
+</html>
