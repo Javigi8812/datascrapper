@@ -8,6 +8,7 @@ import csv
 import logging
 import os
 import sys
+import threading
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -151,6 +152,7 @@ async def run_with_progress(
     output_dir: str,
     concurrency: int = DEFAULT_CONCURRENCY,
     on_progress: ProgressCallback = None,
+    pause_event: threading.Event | None = None,
 ) -> list[dict]:
     """Run scraping with progress callback. Returns list of result dicts."""
     os.makedirs(output_dir, exist_ok=True)
@@ -162,6 +164,14 @@ async def run_with_progress(
 
     async with BrowserManager() as browser:
         for i, url in enumerate(urls):
+            if pause_event and not pause_event.is_set():
+                if on_progress:
+                    on_progress("Pausado — esperando reanudar...", i, len(urls))
+                while not pause_event.is_set():
+                    await asyncio.sleep(0.3)
+                if on_progress:
+                    on_progress("Reanudado", i, len(urls))
+
             if on_progress:
                 on_progress(
                     f"Itinerario {i+1}/{len(urls)}: iniciando...",

@@ -234,6 +234,36 @@
     justify-content: space-between;
   }
   .consolidated-row span { font-size: .82rem; color: var(--text2); }
+  .consolidated-row .btn-group { display: flex; gap: .5rem; }
+
+  .btn-pause {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: .4rem .9rem;
+    border-radius: 6px;
+    font-size: .8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+  .btn-pause:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-pause.paused { border-color: var(--green); color: var(--green); }
+
+  .btn-zip {
+    background: var(--accent-dim);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: .35rem .75rem;
+    border-radius: 5px;
+    font-size: .75rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all .15s;
+  }
+  .btn-zip:hover { filter: brightness(1.15); }
 
   .invalid-urls {
     margin-top: .5rem;
@@ -279,7 +309,10 @@
 
   <!-- Progress Card -->
   <div class="card progress-section" id="progress-section">
-    <div class="card-title">Progreso</div>
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:.75rem">
+      <div class="card-title" style="margin-bottom:0">Progreso</div>
+      <button class="btn-pause" id="btn-pause" onclick="togglePause()" style="display:none">Pausar</button>
+    </div>
     <div class="progress-status" id="progress-status">Preparando...</div>
     <div class="progress-bar-track">
       <div class="progress-bar-fill" id="progress-fill"></div>
@@ -293,7 +326,10 @@
     <div id="results-list"></div>
     <div class="consolidated-row" id="consolidated-row" style="display:none">
       <span>Resumen consolidado</span>
-      <a class="btn-download" id="consolidated-link" href="#">Descargar</a>
+      <div class="btn-group">
+        <button class="btn-zip" id="btn-download-all" onclick="downloadAllZip()">Descargar Todos (ZIP)</button>
+        <a class="btn-download" id="consolidated-link" href="#">Resumen Excel</a>
+      </div>
     </div>
   </div>
 </div>
@@ -301,6 +337,9 @@
 <script>
 let currentTab = 'urls';
 let selectedFile = null;
+let currentJobId = null;
+let isPaused = false;
+let lastResultFiles = [];
 
 function switchTab(tab) {
   currentTab = tab;
@@ -385,6 +424,11 @@ function startScrape() {
       if (data.invalid && data.invalid.length) {
         invalidEl.textContent = 'URLs invalidas: ' + data.invalid.join(', ');
       }
+      currentJobId = data.job_id;
+      isPaused = false;
+      document.getElementById('btn-pause').style.display = '';
+      document.getElementById('btn-pause').textContent = 'Pausar';
+      document.getElementById('btn-pause').classList.remove('paused');
       addLog('Iniciado: ' + data.url_count + ' URL(s)');
       listenProgress(data.job_id);
     })
@@ -420,6 +464,7 @@ function listenProgress(jobId) {
       showResults(data.results, data.consolidated);
       document.getElementById('btn-scrape').disabled = false;
       document.getElementById('btn-scrape').textContent = 'Iniciar Scraping';
+      document.getElementById('btn-pause').style.display = 'none';
     }
 
     if (data.type === 'error') {
@@ -427,6 +472,7 @@ function listenProgress(jobId) {
       addLog('Error: ' + data.message, 'error');
       document.getElementById('btn-scrape').disabled = false;
       document.getElementById('btn-scrape').textContent = 'Iniciar Scraping';
+      document.getElementById('btn-pause').style.display = 'none';
     }
   };
 
@@ -434,15 +480,55 @@ function listenProgress(jobId) {
     source.close();
     document.getElementById('btn-scrape').disabled = false;
     document.getElementById('btn-scrape').textContent = 'Iniciar Scraping';
+    document.getElementById('btn-pause').style.display = 'none';
   };
+}
+
+function togglePause() {
+  if (!currentJobId) return;
+  const btn = document.getElementById('btn-pause');
+  if (!isPaused) {
+    fetch('/pause/' + currentJobId, { method: 'POST' }).then(() => {
+      isPaused = true;
+      btn.textContent = 'Reanudar';
+      btn.classList.add('paused');
+      addLog('Scraping pausado por el usuario');
+    });
+  } else {
+    fetch('/resume/' + currentJobId, { method: 'POST' }).then(() => {
+      isPaused = false;
+      btn.textContent = 'Pausar';
+      btn.classList.remove('paused');
+      addLog('Scraping reanudado');
+    });
+  }
+}
+
+function downloadAllZip() {
+  if (!lastResultFiles.length) return;
+  fetch('/download-all', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filenames: lastResultFiles }),
+  })
+    .then(r => r.blob())
+    .then(blob => {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'itinerarios.zip';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
 }
 
 function showResults(results, consolidated) {
   const section = document.getElementById('results-section');
   const list = document.getElementById('results-list');
   list.innerHTML = '';
+  lastResultFiles = [];
 
   results.forEach(r => {
+    if (r.filename) lastResultFiles.push(r.filename);
     const row = document.createElement('div');
     row.className = 'result-row';
 
@@ -477,6 +563,7 @@ function showResults(results, consolidated) {
 
   const consRow = document.getElementById('consolidated-row');
   if (consolidated) {
+    lastResultFiles.push(consolidated);
     document.getElementById('consolidated-link').href = '/download/' + encodeURIComponent(consolidated);
     consRow.style.display = 'flex';
   } else {

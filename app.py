@@ -10,6 +10,7 @@ import os
 import re
 import threading
 import uuid
+import zipfile
 from queue import Queue, Empty
 
 from flask import Flask, render_template, request, jsonify, Response, send_from_directory
@@ -43,7 +44,9 @@ def _validate_urls(raw: list[str]) -> tuple[list[str], list[str]]:
 
 
 def _run_scrape_thread(job_id: str, urls: list[str]):
-    queue: Queue = _jobs[job_id]["queue"]
+    job = _jobs[job_id]
+    queue: Queue = job["queue"]
+    pause_event: threading.Event = job["pause_event"]
 
     def on_progress(msg: str, current: int, total: int):
         queue.put({"type": "progress", "message": msg, "current": current, "total": total})
@@ -52,8 +55,9 @@ def _run_scrape_thread(job_id: str, urls: list[str]):
     asyncio.set_event_loop(loop)
     try:
         results, consolidated = loop.run_until_complete(
-            run_with_progress(urls, OUTPUT_DIR, DEFAULT_CONCURRENCY, on_progress)
+            run_with_progress(urls, OUTPUT_DIR, DEFAULT_CONCURRENCY, on_progress, pause_event)
         )
+        job["results"] = results
         queue.put({
             "type": "done",
             "results": results,
@@ -63,7 +67,7 @@ def _run_scrape_thread(job_id: str, urls: list[str]):
         queue.put({"type": "error", "message": str(e)})
     finally:
         loop.close()
-        _jobs[job_id]["running"] = False
+        job["running"] = False
 
 
 @app.route("/")
@@ -103,10 +107,14 @@ def scrape():
         return jsonify({"error": "Ninguna URL es valida", "invalid": invalid}), 400
 
     job_id = str(uuid.uuid4())[:8]
+    pause_event = threading.Event()
+    pause_event.set()  # starts unpaused
     _jobs[job_id] = {
         "queue": Queue(),
         "running": True,
         "urls": valid,
+        "pause_event": pause_event,
+        "results": [],
     }
 
     thread = threading.Thread(target=_run_scrape_thread, args=(job_id, valid), daemon=True)
@@ -140,9 +148,47 @@ def progress(job_id: str):
     return Response(generate(), mimetype="text/event-stream")
 
 
+@app.route("/pause/<job_id>", methods=["POST"])
+def pause(job_id: str):
+    if job_id not in _jobs:
+        return jsonify({"error": "Job not found"}), 404
+    _jobs[job_id]["pause_event"].clear()
+    return jsonify({"status": "paused"})
+
+
+@app.route("/resume/<job_id>", methods=["POST"])
+def resume(job_id: str):
+    if job_id not in _jobs:
+        return jsonify({"error": "Job not found"}), 404
+    _jobs[job_id]["pause_event"].set()
+    return jsonify({"status": "resumed"})
+
+
 @app.route("/download/<filename>")
 def download(filename: str):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+
+
+@app.route("/download-all", methods=["POST"])
+def download_all():
+    data = request.get_json(silent=True) or {}
+    filenames = data.get("filenames", [])
+    if not filenames:
+        return jsonify({"error": "No files specified"}), 400
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for fname in filenames:
+            fpath = os.path.join(OUTPUT_DIR, fname)
+            if os.path.isfile(fpath):
+                zf.write(fpath, fname)
+    buf.seek(0)
+
+    return Response(
+        buf.getvalue(),
+        mimetype="application/zip",
+        headers={"Content-Disposition": "attachment; filename=itinerarios.zip"},
+    )
 
 
 if __name__ == "__main__":
