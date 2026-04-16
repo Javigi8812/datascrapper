@@ -192,5 +192,6 @@ def download_all():
 
 
 if __name__ == "__main__":
-    print("Scraper Web UI: http://localhost:1212")
-    app.run(debug=False, port=1212, host="127.0.0.1")
+    port = int(os.environ.get("PORT", 5657))
+    print(f"Scraper Web UI: http://localhost:{port}")
+    app.run(debug=False, port=port, host="0.0.0.0")
