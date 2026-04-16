@@ -6,6 +6,7 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     wget \
     gnupg \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -22,8 +23,9 @@ COPY . .
 # Create output directory
 RUN mkdir -p output
 
-# Expose port (Railway sets PORT env var)
+# Railway sets PORT env var - default to 8080
+ENV PORT=8080
 EXPOSE 8080
 
-# Run the application
-CMD ["python", "app.py"]
+# Run the application with shell to expand PORT variable
+CMD python app.py
